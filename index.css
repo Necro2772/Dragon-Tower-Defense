@@ -63,6 +63,7 @@ header {
 #top-bar > * {
     flex: 1;
     margin: 1em;
+    white-space: pre-line;
 }
 
 #top-bar button {
@@ -141,6 +142,7 @@ header {
 
 #tower-info {
     display: none;
+    grid-template-columns: 1fr 1fr 0.33fr;
     column-gap: 20px;
     padding: 0 10px;
     font-size: 1.125em;
@@ -157,6 +159,7 @@ header {
     grid-row: 2 / 3;
     font-size: inherit;
     height: 5em;
+    white-space: pre-line;
 }
 
 

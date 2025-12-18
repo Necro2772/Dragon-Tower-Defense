@@ -33,10 +33,12 @@ interface EnemyOptions {
 }
 
 abstract class Tower extends Phaser.GameObjects.Sprite {
-    abstract readonly cost: number;
+    abstract cost: number;
     abstract range: number;
     abstract radius: number;
     abstract cd: number;
+    abstract upgrades: (TowerUpgrade | null)[];
+    abstract description: string;
     target: Enemy | null = null;
     canAct = true;
     validColor = 0x111111;
@@ -45,7 +47,7 @@ abstract class Tower extends Phaser.GameObjects.Sprite {
     constructor(config: AbstractTowerOptions) {
         super(config.scene, config.x, config.y, config.texture);
         config.scene.add.existing(this);
-        this.rangeIndicator = config.scene.add.circle(this.x, this.y, config.range - 16, this.validColor, 0.4);
+        this.rangeIndicator = config.scene.add.circle(this.x, this.y, config.range, this.validColor, 0.4);
         this.rangeIndicator.setDepth(0.5);
         this.rangeIndicator.setVisible(false);
         this.setInteractive(new Phaser.Geom.Circle(this.width / 2, this.height / 2, config.radius), Phaser.Geom.Circle.Contains);
@@ -60,13 +62,39 @@ abstract class Tower extends Phaser.GameObjects.Sprite {
 }
 
 class DefaultTower extends Tower {
+    description = 'A default tower!';
     cost = 10;
     range = 120;
     cd = 1000;
     radius = 16;
+    upgrades: (TowerUpgrade | null)[];
     constructor(config: TowerOptions) {
         let texture = "tower";
         super({scene:config.scene, x:config.x, y:config.y, type:config.type, texture:texture, range:120, radius:16});
+        this.upgrades = [
+            new TowerUpgrade(15, 'Increase attack speed', (tower: Tower) => {
+                tower.cost += this.cost;
+                tower.cd *= 0.8;
+                return null;
+            }),
+            new TowerUpgrade(20, 'Increase range', (tower: Tower) => {
+                tower.cost += this.cost;
+                tower.range *= 1.3;
+                tower.rangeIndicator.radius = tower.range;
+                return null;
+            }),
+        ]
+    }
+}
+
+class TowerUpgrade {
+    cost: number;
+    description: string;
+    upgrade: (tower: Tower) => TowerUpgrade | null;
+    constructor(cost: number, description: string, upgradeFunction: (tower: Tower) => TowerUpgrade | null) {
+        this.cost = cost;
+        this.description = description;
+        this.upgrade = upgradeFunction;
     }
 }
 

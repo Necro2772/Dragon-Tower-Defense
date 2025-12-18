@@ -10,6 +10,7 @@ class DragonTD extends Phaser.Scene {
     lives = 20;
     treasure = 10;
     level = 0;
+    sellMult = 0.7;
     gameSpeed = GameSpeed.Paused;
 
     preload() {
@@ -258,8 +259,26 @@ class DragonTD extends Phaser.Scene {
         } else {
             this.selected = tower;
             tower?.select(true);
-            this.game.events.emit('selectTower', [tower]);
+            this.game.events.emit('selectTower', [this.selected]);
         }
+        console.log(this.selected);
+    }
+
+    sell() {
+        console.log(this.selected);
+        this.treasure += Math.round(this.selected!.cost * this.sellMult);
+        this.selected?.rangeIndicator?.destroy();
+        this.selected?.destroy();
+        this.selected = null;
+        this.game.events.emit('selectTower', [null]);
+    }
+
+    upgrade(index: number) {
+        let tower = this.selected!;
+        if (this.treasure < tower.upgrades[index]!.cost) return;
+        this.treasure -= tower.upgrades[index]!.cost;
+        tower.upgrades[index] = tower.upgrades[index]!.upgrade(tower);
+        this.game.events.emit('selectTower', [this.selected]);
     }
 
     buyToggle(index: number) {
@@ -371,10 +390,27 @@ game.events.addListener('deselectCard', ([index]: [number]) => {
 });
 
 game.events.addListener('selectTower', ([tower]: [Tower | null]) => {
+    let scene = (game.scene.getAt(0) as DragonTD);
     if (tower != null) {
-        let infoBar = document.getElementById('info-bar');
         document.getElementById('tower-list')!.style.display = 'none';
         document.getElementById('tower-info')!.style.display = 'grid';
+        document.querySelector('#tower-info p:first-child')!.textContent = tower.description;
+        let sellButton = document.querySelector('#info-bar .sell') as HTMLButtonElement;
+        sellButton.onclick = () => {scene.sell()};
+        sellButton.textContent = 'Sell\r\n' + Math.round(tower.cost * scene.sellMult);
+        let upgradeButtons = document.querySelectorAll('#info-bar .upgrade');
+        for (let i = 0; i < upgradeButtons.length; i++) {
+            let button = upgradeButtons[i] as HTMLButtonElement;
+            if (tower.upgrades.length <= i || tower.upgrades[i] == null) {
+                button.textContent = 'X';
+                button.onclick = () => {};
+            } else {
+                button.textContent = tower.upgrades[i]!.description + '\r\n' + tower.upgrades[i]!.cost;
+                button.onclick = () => {
+                    scene.upgrade(i);
+                }
+            }
+        }
     } else {
         document.getElementById('tower-list')!.style.display = 'flex';
         document.getElementById('tower-info')!.style.display = 'none';
