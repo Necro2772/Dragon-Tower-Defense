@@ -1,0 +1,171 @@
+:root, [data-theme="dark"] {
+    --background-primary: #303030;
+    --background-dark: #222222;
+    --background-accent: #282828;
+    --text-color: #c0c0c0;
+    --game-background: #444444;
+}
+
+[data-theme="light"] {
+    --background-primary: #cccccc;
+    --background-dark: #999999;
+    --background-accent: #9e9e9e;
+    --text-color: #222222;
+}
+
+body, button {
+    font-family:'Courier New', Courier, monospace;
+    color: var(--text-color);
+}
+
+h1 {
+    text-align: center;
+}
+
+button {
+    font-size: 1.25rem;
+}
+
+body {
+    background-color: var(--background-primary);
+    margin: 0;
+}
+
+body > * {
+    padding: 8px;
+    animation: 1s 1 forwards fade-in;
+}
+
+header {
+    background-color: var(--background-dark);
+}
+
+#main-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 0;
+    font-size: 1em;
+}
+
+#game-ui {
+    flex: 1;
+    background-color: var(--game-background);
+    max-width: 900px;
+}
+
+#top-bar {
+    display: flex;
+    font-size: 1.25em;
+}
+
+#top-bar > * {
+    flex: 1;
+    margin: 1em;
+}
+
+#top-bar button {
+    background-color: #444444;
+}
+
+#info-bar {
+    height: 8.5em;
+    margin: 0;
+    padding: 0;
+}
+
+#tower-list {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    list-style-type: none;
+    overflow-x: scroll;
+    overflow-y: hidden;
+}
+
+#tower-list > li {
+    height: 7em;
+    width: fit-content;
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+}
+
+#tower-list button {
+    flex-grow: 0;
+    flex-shrink: 0;
+    margin: 5px;
+    padding: 0;
+    width: 5.5em;
+    height: 100%;
+    background-size: contain;
+}
+
+#tower-list button + .container {
+    background-color: #282828;
+    overflow: hidden;
+    margin-top: 7px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+#tower-list button + .container > p {
+    width: 30em;
+    margin: 0;
+    overflow: hidden;
+}
+
+#tower-list button[class='disabled'] + .container {
+    transition: all 1s ease-out;
+    max-width: 0;
+    padding-left: 0px;
+    padding-right: 0px;
+}
+
+#tower-list button[class='enabled'] + .container {
+    transition: all 1s ease-out;
+    max-width: 30em;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+#tower-list .disabled, #info-bar button {
+    background-color: #444444;
+}
+
+#tower-list .enabled {
+    background-color: #9e9e9e;
+}
+
+#tower-info {
+    display: none;
+    column-gap: 20px;
+    padding: 0 10px;
+    font-size: 1.125em;
+}
+
+#tower-info p:first-child {
+    grid-row: 1 / 2;
+    grid-column: 1 / 4;
+    height: 1.5em;
+    margin: 0.25em
+}
+
+#tower-info button {
+    grid-row: 2 / 3;
+    font-size: inherit;
+    height: 5em;
+}
+
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}

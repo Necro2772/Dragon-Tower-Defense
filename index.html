@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>Dragon Tower Defense</title>
+        <link href="./index.css" rel="stylesheet" />
+        <link href="./DragonTD.css" rel="stylesheet" />
+        <link href="./wide.css" rel="stylesheet" media="screen and (width > 900px)" />
+    </head>
+    <body>
+        <header>
+            <h1>Dragon Tower Defense</h1>
+        </header>
+        <noscript>
+            <p>Javascript is not enabled. This application requires JavaScript to be enabled in order to function.</p>
+        </noscript>
+        <div id="main-content">
+            <div id="game-ui">
+                <div id="top-bar">
+                    <p id="levelCounter">Level: 0</p>
+                    <p id="lifeCounter">Lives: 0</p>
+                    <p id="treasureCounter">Treasure: 0</p>
+                    <button id="speedButton">Play</button>
+                </div>
+                <div id="game-canvas"></div>
+                <div id="info-bar">
+                    <ol id="tower-list"></ol>
+                    <div id="tower-info">
+                        <p>desc</p>
+                        <button>upgrade 1 desc<br>100</button>
+                        <button>upgrade 2 desc<br>200</button>
+                        <button>sell<br>10</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <script src="js/phaser.min.js"></script>
+        <script src="js/Entity.js"></script>
+        <script src="js/DragonTD.js" defer></script>
+    </body>
+</html>
