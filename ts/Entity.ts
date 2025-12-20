@@ -179,7 +179,6 @@ interface LevelMap {
 }
 
 enum GameSpeed {
-    Paused,
     Normal,
     Fast1,
     Fast2,

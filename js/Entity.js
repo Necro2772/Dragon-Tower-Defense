@@ -129,9 +129,8 @@ var ProjectileType;
 })(ProjectileType || (ProjectileType = {}));
 var GameSpeed;
 (function (GameSpeed) {
-    GameSpeed[GameSpeed["Paused"] = 0] = "Paused";
-    GameSpeed[GameSpeed["Normal"] = 1] = "Normal";
-    GameSpeed[GameSpeed["Fast1"] = 2] = "Fast1";
-    GameSpeed[GameSpeed["Fast2"] = 3] = "Fast2";
+    GameSpeed[GameSpeed["Normal"] = 0] = "Normal";
+    GameSpeed[GameSpeed["Fast1"] = 1] = "Fast1";
+    GameSpeed[GameSpeed["Fast2"] = 2] = "Fast2";
 })(GameSpeed || (GameSpeed = {}));
 //# sourceMappingURL=Entity.js.map

@@ -6,12 +6,14 @@ class DragonTD extends Phaser.Scene {
     projectiles!: Phaser.GameObjects.Group;
     selected: Tower | null = null;
     selectedCard: number = -1;
-    isPlaying = false;
+    isSpawning = false;
     lives = 20;
     treasure = 10;
     level = 0;
     sellMult = 0.7;
-    gameSpeed = GameSpeed.Paused;
+    gameSpeed = GameSpeed.Normal;
+    timeMult = 1;
+    isPaused = true;
 
     preload() {
         this.load.tilemapTiledJSON("map", "maps/map.json");
@@ -44,7 +46,7 @@ class DragonTD extends Phaser.Scene {
         if (!this.time.paused) {
             this.enemies.children.each((child) => {
                 let enemy = child as Enemy;
-                let moveDist = enemy.speed * delta / 1000;
+                let moveDist = enemy.speed * delta / 1000 * this.timeMult;
                 enemy.progress += moveDist;
                 switch (enemy.direction) {
                     case 0:
@@ -127,25 +129,36 @@ class DragonTD extends Phaser.Scene {
             }
         }
         
-        // UI Processing
         this.game.events.emit('updateTopBar', [this.lives, this.treasure, this.level]);
 
-        if (!this.isPlaying && !this.time.paused && this.enemies?.countActive() < 1) {
+        if (!this.isSpawning && !this.time.paused && this.enemies?.countActive() < 1) {
             this.pause();
-            this.game.events.emit('changeSpeed', [this.changeSpeed()]);
+            this.projectiles.clear(true, true);
         }
     }
 
     changeSpeed(): string {
+        if (this.isPaused) {
+            this.resume();
+        } else {
+            this.gameSpeed = (this.gameSpeed + 1) % 3;
+        }
         switch (this.gameSpeed) {
-            case GameSpeed.Paused:
-                this.resume();
-                this.gameSpeed = GameSpeed.Normal;
-                return 'Pause';
             case GameSpeed.Normal:
-                this.pause();
-                this.gameSpeed = GameSpeed.Paused;
-                return 'Play';
+                this.timeMult = 1;
+                this.time.timeScale = this.timeMult;
+                this.physics.world.timeScale = 1 / this.timeMult;
+                return '>';
+            case GameSpeed.Fast1:
+                this.timeMult = 1.8;
+                this.time.timeScale = this.timeMult;
+                this.physics.world.timeScale = 1 / this.timeMult;
+                return '>>';
+            case GameSpeed.Fast2:
+                this.timeMult = 3;
+                this.time.timeScale = this.timeMult;
+                this.physics.world.timeScale = 1 / this.timeMult;
+                return '>>>'
             default:
                 return '';
         }
@@ -168,31 +181,62 @@ class DragonTD extends Phaser.Scene {
     }
 
     startLevel() {
-        this.isPlaying = true;
+        this.isSpawning = true;
         this.level += 1;
-        this.time.addEvent({delay: 750, repeat: 50, startAt: 2000, callback: ()=>{
-            this.spawnEnemy(this.levelMap.spawn.x, this.levelMap.spawn.y);
+        let enemyData = this.getLevelEnemyData();
+        let totalTime = 0;
+        for (let i = 0; i < enemyData.length; i++) {
+            this.time.addEvent({delay: enemyData[i].delay * 1000, repeat: enemyData[i].number, startAt: enemyData[i].start * 1000, callback: ()=>{
+                this.spawnEnemy(this.levelMap.spawn.x, this.levelMap.spawn.y, enemyData[i].enemyType);
+            }});
+            totalTime = Math.max(totalTime, enemyData[i].start + enemyData[i].number * enemyData[i].delay);
+        }
+        this.time.addEvent({delay: (totalTime + 1) * 1000, callback: ()=>{
+            this.isSpawning = false;
         }});
-        this.time.addEvent({delay: 2001 + 50 * 750, callback: ()=>{
-            this.isPlaying = false;
-        }});
+    }
+
+    getLevelEnemyData(): [{enemyType: EnemyTypes.Default, number: number, delay: number, start: number}] {
+        if (this.level <= 1) {
+            return [
+                {
+                    enemyType: EnemyTypes.Default,
+                    number: 50,
+                    delay: 0.75,
+                    start: 0
+                }
+            ]
+        } else {
+            return [
+                {
+                    enemyType: EnemyTypes.Default,
+                    number: 50 * (1.2 ** this.level),
+                    delay: 0.75 * (0.85 ** this.level),
+                    start: 0
+                }
+            ]
+        }
+        
     }
 
     pause() {
         this.time.paused = true;
         this.physics.pause();
+        this.game.events.emit('changeSpeed', ['Play']);
+        this.isPaused = true;
     }
 
     resume() {
-        if (!this.isPlaying && this.enemies.countActive() < 1) {
+        if (!this.isSpawning && this.enemies.countActive() < 1) {
             this.startLevel();
         }
         this.time.paused = false;
         this.physics.resume();
+        this.isPaused = false;
     }
 
-    spawnEnemy(x: number, y: number) {
-        let enemy = new Enemy({scene:this, x:x, y:y, type: EnemyTypes.Default, texture:'enemy'});
+    spawnEnemy(x: number, y: number, enemyType: EnemyTypes) {
+        let enemy = new Enemy({scene:this, x:x, y:y, type: enemyType, texture:'enemy'});
         this.enemies.add(enemy);
         this.moveEnemy(enemy);
     }
@@ -261,11 +305,9 @@ class DragonTD extends Phaser.Scene {
             tower?.select(true);
             this.game.events.emit('selectTower', [this.selected]);
         }
-        console.log(this.selected);
     }
 
     sell() {
-        console.log(this.selected);
         this.treasure += Math.round(this.selected!.cost * this.sellMult);
         this.selected?.rangeIndicator?.destroy();
         this.selected?.destroy();
@@ -423,5 +465,7 @@ game.events.addListener('changeSpeed', ([newSpeed]: [string]) => {
 });
 
 speedButton.onclick = () => {
-    speedButton.textContent = (game.scene.getAt(0) as DragonTD).changeSpeed();
+    let scene = (game.scene.getAt(0) as DragonTD);
+    let newText = scene.changeSpeed();
+    if (newText != '') speedButton.textContent = newText;
 }
