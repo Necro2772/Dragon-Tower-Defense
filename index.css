@@ -51,8 +51,8 @@ header {
 
 #game-ui {
     flex: 1;
+    display: block;
     background-color: var(--game-background);
-    max-width: 900px;
 }
 
 #top-bar {

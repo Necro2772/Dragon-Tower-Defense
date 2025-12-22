@@ -2,13 +2,15 @@ class DragonTD extends Phaser.Scene {
     towerCards!: TowerCard[];
     levelMap!: LevelMap;
     enemies!: Phaser.GameObjects.Group;
+    slowableEnemies!: Phaser.GameObjects.Group;
     towers!: Phaser.GameObjects.Group;
-    projectiles!: Phaser.GameObjects.Group;
+    damageProjectiles!: Phaser.GameObjects.Group;
+    iceProjectiles!: Phaser.GameObjects.Group;
     selected: Tower | null = null;
     selectedCard: number = -1;
     isSpawning = false;
     lives = 20;
-    treasure = 10;
+    treasure = 100;
     level = 0;
     sellMult = 0.7;
     gameSpeed = GameSpeed.Normal;
@@ -18,9 +20,19 @@ class DragonTD extends Phaser.Scene {
     preload() {
         this.load.tilemapTiledJSON("map", "maps/map.json");
         this.load.image('extruded-tiles', 'img/extruded-tileset.png');
-        this.load.image("enemy", "img/ball.png");
-        this.load.image("tower", "img/dragon.png");
-        this.load.image("fireball", "img/ball.png");
+        this.load.spritesheet("red-wyvern", "img/wyvern-red.png", { frameWidth: 64, spacing: 2});
+        this.load.spritesheet("green-wyvern", "img/wyvern-green.png", { frameWidth: 64, spacing: 2});
+        this.load.spritesheet("blue-wyvern", "img/wyvern-blue.png", { frameWidth: 64, spacing: 2});
+        this.load.spritesheet("purple-wyvern", "img/wyvern-purple.png", { frameWidth: 64, spacing: 2});
+        this.load.spritesheet("gold-wyvern", "img/wyvern-gold.png", { frameWidth: 64, spacing: 2});
+        this.load.spritesheet("dragon-fire", "img/dragon-fire.png", {frameWidth: 96, spacing: 2});
+        this.load.spritesheet("dragon-ice", "img/dragon-ice.png", {frameWidth: 96, spacing: 2});
+        this.load.spritesheet("dragon-earth", "img/dragon-earth.png", {frameWidth: 96, spacing: 2});
+        this.load.spritesheet("dragon-water", "img/dragon-water.png", {frameWidth: 96, spacing: 2});
+        this.load.spritesheet("fireball", "img/fireball.png", {frameWidth: 32, spacing: 2});
+        this.load.spritesheet("icebreath", "img/icebreath.png", {frameWidth: 32, spacing: 2});
+        this.load.spritesheet("rockshard", "img/rockshard.png", {frameWidth: 32, spacing: 2});
+        this.load.spritesheet("rockshardlarge", "img/rockshardlarge.png", {frameWidth: 32, spacing: 2});
     }
 
     create() {
@@ -28,25 +40,95 @@ class DragonTD extends Phaser.Scene {
         this.cameras.main.centerOn(this.levelMap.tiles.widthInPixels / 2, this.levelMap.tiles.heightInPixels / 2);
         this.cameras.main.setZoom(this.cameras.main.height / this.levelMap.tiles.heightInPixels);
         this.enemies = this.add.group();
+        this.slowableEnemies = this.add.group();
         this.towers = this.add.group();
-        this.projectiles = this.add.group();
+        this.damageProjectiles = this.add.group();
+        this.iceProjectiles = this.add.group();
         this.towerCards = [
-            new TowerCard(TowerType.Default,
-                "tower", "a dragon! crispt! need to test how longer descriptions work on the layout so I'm just going to try typing for a while and then see how very long sentences do and if they fit in the box and if they wrap and all"
+            new TowerCard(TowerType.Fireball,
+                "dragon-fire", "a dragon! crispt!",
+                60,
             ),
+            new TowerCard(TowerType.Ice,
+                "dragon-ice", "An ice dragon who freezes their foes with icy breath!",
+                110,
+            ),
+            new TowerCard(TowerType.Earth,
+                "dragon-earth", "An earth dragon who shoots sharp rock shards!",
+                100,
+            )
         ]
         this.game.events.emit('populateTowerList', [
             this.towerCards,
         ])
         this.pause();
+
+        // Animation loading
+        let enemyKeys = ['red-wyvern', 'green-wyvern', 'blue-wyvern', 'purple-wyvern', 'gold-wyvern'];
+        for (let i = 0; i < enemyKeys.length; i++) {
+            this.anims.create({
+                key: enemyKeys[i] + '-fly',
+                frames: this.anims.generateFrameNumbers(enemyKeys[i], {
+                    frames: [1, 2, 1, 0]
+                }),
+                frameRate: 4,
+                repeat: -1,
+            });
+            this.anims.create({
+                key: enemyKeys[i] + '-flyslow',
+                frames: this.anims.generateFrameNumbers(enemyKeys[i], {
+                    frames: [1, 2, 1, 0]
+                }),
+                frameRate: 2,
+                repeat: -1,
+            });
+        }
+        this.anims.create({
+            key: 'fireball-idle',
+            frames: this.anims.generateFrameNumbers('fireball', {
+                frames: [0, 1, 2]
+            }),
+            frameRate: 15,
+        })
+        this.anims.create({
+            key: 'fireball-destroy',
+            frames: this.anims.generateFrameNumbers('fireball', {
+                frames: [3, 4, 5]
+            }),
+            frameRate: 15,
+        })
+        this.anims.create({
+            key: 'rockshard-destroy',
+            frames: this.anims.generateFrameNumbers('rockshard', {
+                frames: [1, 2, 3]
+            }),
+            frameRate: 15,
+        })
+        this.anims.create({
+            key: 'rockshardlarge-destroy',
+            frames: this.anims.generateFrameNumbers('rockshardlarge', {
+                frames: [1, 2, 3]
+            }),
+            frameRate: 15,
+        })
+        for (let i = 0; i < this.towerCards.length; i++) {
+            this.anims.create({
+                key: this.towerCards[i].image + '-attack',
+                frames: this.anims.generateFrameNumbers(this.towerCards[i].image, {
+                    frames: [1, 0]
+                }),
+                frameRate: 6,
+            })
+        }
     }
 
     update(time: number, delta: number) {
-        // Enemy Movement
         if (!this.time.paused) {
+            // Enemy Movement
             this.enemies.children.each((child) => {
                 let enemy = child as Enemy;
-                let moveDist = enemy.speed * delta / 1000 * this.timeMult;
+                if (!enemy.active) return true;
+                let moveDist = enemy.speed * enemy.speedmult * delta / 1000 * this.timeMult;
                 enemy.progress += moveDist;
                 switch (enemy.direction) {
                     case 0:
@@ -96,25 +178,38 @@ class DragonTD extends Phaser.Scene {
                             }
                         }
                     }
-                    if (tower.target == null) return true;
+                    if (tower.target == null) {
+                        if (tower.frame.name != '0') tower.setFrame(0);
+                        return true;
+                    }
                 }
                 // rotate towards target
                 tower.setRotation(Phaser.Math.Angle.Between(tower.x, tower.y, tower.target.x, tower.target.y));
-                if (tower.canAct) {
-                    this.towerAction(tower);
-                    tower.canAct = false;
-                    this.time.addEvent({delay: tower.cd, callback: () => {tower.canAct = true;}});
+                for (let i = 0; i < tower.canAct.length; i++) {
+                    if (tower.canAct[i]) {
+                        tower.towerActions[i].action(this);
+                        tower.canAct[i] = false;
+                        this.time.addEvent({delay: tower.towerActions[i].cd, callback: () => {tower.canAct[i] = true;}});
+                        break;
+                    }
                 }
                 return true;
             })
         }
 
         // Collisions
-        this.physics.collide(
-            this.projectiles, this.enemies, 
+        this.physics.overlap(
+            this.damageProjectiles, this.enemies, 
             (projectile, enemy) => {
                 this.hitEnemy(projectile as Projectile, enemy as Enemy);
-            }
+            }, (projectile, enemy) => { return (enemy as Enemy).active;}
+        );
+
+        this.physics.overlap(
+            this.iceProjectiles, this.slowableEnemies, 
+            (projectile, enemy) => {
+                this.hitEnemy(projectile as Projectile, enemy as Enemy);
+            }, (projectile, enemy) => { return (enemy as Enemy).active;}
         );
 
         // Pointer processing
@@ -131,9 +226,10 @@ class DragonTD extends Phaser.Scene {
         
         this.game.events.emit('updateTopBar', [this.lives, this.treasure, this.level]);
 
-        if (!this.isSpawning && !this.time.paused && this.enemies?.countActive() < 1) {
+        if (!this.isSpawning && !this.time.paused && this.enemies?.getLength() < 1) {
             this.pause();
-            this.projectiles.clear(true, true);
+            this.damageProjectiles.clear(true, true);
+            this.iceProjectiles.clear(true, true);
         }
     }
 
@@ -196,11 +292,47 @@ class DragonTD extends Phaser.Scene {
         }});
     }
 
-    getLevelEnemyData(): [{enemyType: EnemyTypes.Default, number: number, delay: number, start: number}] {
+    getLevelEnemyData(): [{enemyType: EnemyTypes, number: number, delay: number, start: number}] {
         if (this.level <= 1) {
             return [
                 {
-                    enemyType: EnemyTypes.Default,
+                    enemyType: EnemyTypes.Red,
+                    number: 50,
+                    delay: 0.75,
+                    start: 0
+                }
+            ]
+        } else if (this.level <= 2) {
+            return [
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 50,
+                    delay: 0.75,
+                    start: 0
+                }
+            ]
+        } else if (this.level <= 3) {
+            return [
+                {
+                    enemyType: EnemyTypes.Blue,
+                    number: 50,
+                    delay: 0.75,
+                    start: 0
+                }
+            ]
+        } else if (this.level <= 4) {
+            return [
+                {
+                    enemyType: EnemyTypes.Purple,
+                    number: 50,
+                    delay: 0.75,
+                    start: 0
+                }
+            ]
+        } else if (this.level <= 5) {
+            return [
+                {
+                    enemyType: EnemyTypes.Gold,
                     number: 50,
                     delay: 0.75,
                     start: 0
@@ -209,7 +341,7 @@ class DragonTD extends Phaser.Scene {
         } else {
             return [
                 {
-                    enemyType: EnemyTypes.Default,
+                    enemyType: EnemyTypes.Red,
                     number: 50 * (1.2 ** this.level),
                     delay: 0.75 * (0.85 ** this.level),
                     start: 0
@@ -236,8 +368,9 @@ class DragonTD extends Phaser.Scene {
     }
 
     spawnEnemy(x: number, y: number, enemyType: EnemyTypes) {
-        let enemy = new Enemy({scene:this, x:x, y:y, type: enemyType, texture:'enemy'});
+        let enemy = new Enemy({scene:this, x:x, y:y, type: enemyType});
         this.enemies.add(enemy);
+        this.slowableEnemies.add(enemy);
         this.moveEnemy(enemy);
     }
 
@@ -254,15 +387,19 @@ class DragonTD extends Phaser.Scene {
         switch (enemy.direction) {
             case 0:
                 enemy.distanceToMove = enemy.getCenter().y - numTiles * tile.height;
+                enemy.angle = -90;
                 break;
             case 1:
                 enemy.distanceToMove = enemy.getCenter().x + numTiles * tile.width;
+                enemy.angle = 0;
                 break;
             case 2:
                 enemy.distanceToMove = enemy.getCenter().y + numTiles * tile.height;
+                enemy.angle = 90;
                 break;
             case 3:
                 enemy.distanceToMove = enemy.getCenter().x - numTiles * tile.width;
+                enemy.angle = 180;
                 break;
             default:
                 break;
@@ -270,28 +407,41 @@ class DragonTD extends Phaser.Scene {
     }
 
     hitEnemy(projectile: Projectile, enemy: Enemy) {
-        enemy.currentHealth -= projectile.damage;
-        if (enemy.currentHealth <= 0) this.enemyDeath(enemy);
-        projectile.destroy();
+        if (this.iceProjectiles.contains(projectile)) {
+            enemy.speedmult = projectile.slowMult;
+            enemy.setTint(0x5555ff);
+            this.slowableEnemies.remove(enemy);
+            
+            this.time.delayedCall(projectile.effectDuration, () => {
+                enemy.speedmult = 1;
+                enemy.clearTint()
+                this.slowableEnemies.add(enemy);
+            })
+        }
+        if (this.damageProjectiles.contains(projectile)) {
+            enemy.currentHealth -= projectile.damage;
+            if (enemy.currentHealth <= 0) this.enemyDeath(enemy);
+            projectile.pierce--;
+            if (projectile.pierce <= 0) {
+                projectile.play(projectile.texture.key + '-destroy');
+                this.damageProjectiles.remove(projectile);
+                if ('setVelocity' in projectile.body!) projectile.body.setVelocity(0);
+                projectile.once('animationcomplete', () => {projectile.destroy(); });
+            }
+        }
     }
 
     enemyDeath(enemy: Enemy) {
         this.treasure += enemy.treasure;
-        enemy.destroy();
+        let deathFrame = Math.floor(Math.random() * 3);
+        enemy.stop();
+        enemy.setFrame(deathFrame + 3);
+        enemy.setActive(false);
+        this.time.delayedCall(200, () => {enemy.destroy()});
     }
 
     takeDamage(damage: number) {
         this.lives -= damage;
-    }
-
-    towerAction(tower: Tower) {
-        let projectile = new Projectile({scene:this, x:tower.x, y:tower.y, type:ProjectileType.Default});
-        this.projectiles.add(projectile);
-        this.time.addEvent({delay:projectile.lifetime, callback: (child: Projectile) => {child.destroy()}, args:[projectile]});
-        if ('setVelocity' in projectile.body!) {
-            this.physics.moveToObject(projectile, tower.target!, projectile.speed);
-            projectile.setRotation(tower.rotation);
-        }
     }
 
     select(tower: Tower | null) {
@@ -342,7 +492,7 @@ class DragonTD extends Phaser.Scene {
             });
             this.selectedCard = -1;
         } else {
-            let tower = new DefaultTower({scene:this, x:this.input.activePointer.worldX, y:this.input.activePointer.worldY, type:this.towerCards[index].towerType});
+            let tower = this.towerCards[index].spawn(this, this.input.activePointer.worldX, this.input.activePointer.worldY);
             tower.setDepth(3);
             tower.select(true);
             this.selected = tower;
@@ -364,7 +514,7 @@ class DragonTD extends Phaser.Scene {
     isPlacementValid(): boolean {
         return (this.selected != null 
             && this.levelMap.tiles.getTileAtWorldXY(this.selected?.x, this.selected?.y, false, this.cameras.main, 'Background') != null
-            && this.levelMap.tiles.getTilesWithinWorldXY(this.selected.x - this.selected.width / 2, this.selected.y - this.selected.height / 2, this.selected.width, this.selected.height, {isNotEmpty: true}, this.cameras.main, 'Path')?.length == 0
+            && this.levelMap.tiles.getTilesWithinWorldXY(this.selected.x - this.selected.radius, this.selected.y - this.selected.radius, this.selected.radius * 2, this.selected.radius * 2, {isNotEmpty: true}, this.cameras.main, 'Path')?.length == 0
             && this.towers.getChildren().every((child: Phaser.GameObjects.GameObject) => {
                 let tower = child as Tower;
                 return (tower.x - this.selected!.x) ** 2 + (tower.y - this.selected!.y) ** 2 > (tower.radius + this.selected!.radius) ** 2;
@@ -378,8 +528,7 @@ const config = {
     scene: DragonTD,
     parent: document.getElementById('game-canvas'),
     scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
+        mode: Phaser.Scale.WIDTH_CONTROLS_HEIGHT,
     },
     max: {
         width: 900,
@@ -411,7 +560,7 @@ game.events.addListener('populateTowerList', ([cards]: [TowerCard[]]) => {
     for (let i = 0; i < cards.length; i++) {
         let newTower = document.createElement("li");
         let newButton = newTower.appendChild(document.createElement("button"));
-        newButton.style = "background-image: url(/img/dragon.png);\n"
+        newButton.style = "background-image: url(/img/card-" + cards[i].image + ".png);\n"
         newButton.className = 'disabled';
         newButton.onclick = (() => {
             if (newButton.className != 'enabled') {
@@ -422,7 +571,7 @@ game.events.addListener('populateTowerList', ([cards]: [TowerCard[]]) => {
         let towerDescBox = newTower.appendChild(document.createElement("div"));
         towerDescBox.className = "container";
         let towerDesc = towerDescBox.appendChild(document.createElement("p"));
-        towerDesc.textContent = cards[i].description;
+        towerDesc.textContent = cards[i].description + '\r\nCost: ' + cards[i].cost;
         towerList.appendChild(newTower);
     }
 });
