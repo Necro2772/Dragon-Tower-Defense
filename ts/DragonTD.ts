@@ -10,7 +10,7 @@ class DragonTD extends Phaser.Scene {
     selectedCard: number = -1;
     isSpawning = false;
     lives = 20;
-    treasure = 100;
+    treasure = 200;
     level = 0;
     sellMult = 0.7;
     gameSpeed = GameSpeed.Normal;
@@ -28,11 +28,13 @@ class DragonTD extends Phaser.Scene {
         this.load.spritesheet("dragon-fire", "img/dragon-fire.png", {frameWidth: 96, spacing: 2});
         this.load.spritesheet("dragon-ice", "img/dragon-ice.png", {frameWidth: 96, spacing: 2});
         this.load.spritesheet("dragon-earth", "img/dragon-earth.png", {frameWidth: 96, spacing: 2});
+        this.load.spritesheet("dragon-light", "img/dragon-light.png", {frameWidth: 96, spacing: 2});
         this.load.spritesheet("dragon-water", "img/dragon-water.png", {frameWidth: 96, spacing: 2});
         this.load.spritesheet("fireball", "img/fireball.png", {frameWidth: 32, spacing: 2});
         this.load.spritesheet("icebreath", "img/icebreath.png", {frameWidth: 32, spacing: 2});
         this.load.spritesheet("rockshard", "img/rockshard.png", {frameWidth: 32, spacing: 2});
         this.load.spritesheet("rockshardlarge", "img/rockshardlarge.png", {frameWidth: 32, spacing: 2});
+        this.load.spritesheet("lightbolt", "img/lightbolt.png", {frameWidth: 32, spacing: 2});
     }
 
     create() {
@@ -47,15 +49,19 @@ class DragonTD extends Phaser.Scene {
         this.towerCards = [
             new TowerCard(TowerType.Fireball,
                 "dragon-fire", "a dragon! crispt!",
-                60,
+                120,
             ),
             new TowerCard(TowerType.Ice,
                 "dragon-ice", "An ice dragon who freezes their foes with icy breath!",
-                110,
+                145,
             ),
             new TowerCard(TowerType.Earth,
                 "dragon-earth", "An earth dragon who shoots sharp rock shards!",
-                100,
+                90,
+            ),
+            new TowerCard(TowerType.Light,
+                "dragon-light", "An earth dragon who shoots sharp rock shards!",
+                200,
             )
         ]
         this.game.events.emit('populateTowerList', [
@@ -95,21 +101,28 @@ class DragonTD extends Phaser.Scene {
             frames: this.anims.generateFrameNumbers('fireball', {
                 frames: [3, 4, 5]
             }),
-            frameRate: 15,
+            frameRate: 10,
         })
         this.anims.create({
             key: 'rockshard-destroy',
             frames: this.anims.generateFrameNumbers('rockshard', {
                 frames: [1, 2, 3]
             }),
-            frameRate: 15,
+            frameRate: 10,
         })
         this.anims.create({
             key: 'rockshardlarge-destroy',
             frames: this.anims.generateFrameNumbers('rockshardlarge', {
                 frames: [1, 2, 3]
             }),
-            frameRate: 15,
+            frameRate: 10,
+        })
+        this.anims.create({
+            key: 'lightbolt-destroy',
+            frames: this.anims.generateFrameNumbers('lightbolt', {
+                frames: [1, 2, 3]
+            }),
+            frameRate: 10,
         })
         for (let i = 0; i < this.towerCards.length; i++) {
             this.anims.create({
@@ -119,6 +132,18 @@ class DragonTD extends Phaser.Scene {
                 }),
                 frameRate: 6,
             })
+        }
+
+        // Allow testing by starting at later levels
+        let testLevel = 25;
+        for (let i = 0; i < testLevel; i++) {
+            let levelData = this.getLevelEnemyData();
+            for (let index = 0; index < levelData.length; index++) {
+                let testEnemy = new Enemy({scene:this, x:0, y:0, type:levelData[index].enemyType});
+                this.treasure += testEnemy.treasure * levelData[index].number;
+                testEnemy.destroy();
+            }
+            this.level = i;
         }
     }
 
@@ -167,21 +192,21 @@ class DragonTD extends Phaser.Scene {
                 if (tower.target != null && (!tower.target.active || (tower.x - tower.target.x) ** 2 + (tower.y - tower.target.y) ** 2 > tower.range ** 2)) {
                     tower.target = null;
                 }
-                if (tower.target == null) {
-                    let maxProgress = 0;
-                    for (let i = 0; i < this.enemies.children.entries.length; i++) {
-                        let enemy = this.enemies.children.entries[i] as Enemy;
-                        if (enemy.active && (tower.x - enemy.x) ** 2 + (tower.y - enemy.y) ** 2 <= tower.range ** 2) {
-                            if (enemy.progress > maxProgress) {
-                                maxProgress = enemy.progress;
-                                tower.target = enemy;
-                            }
+                let maxProgress = 0;
+                if (tower.target != null) maxProgress = tower.target.progress;
+                for (let i = 0; i < this.enemies.children.entries.length; i++) {
+                    let enemy = this.enemies.children.entries[i] as Enemy;
+                    if (enemy.progress < maxProgress) continue;
+                    if (enemy.active && (tower.x - enemy.x) ** 2 + (tower.y - enemy.y) ** 2 <= tower.range ** 2) {
+                        if (enemy.progress > maxProgress) {
+                            maxProgress = enemy.progress;
+                            tower.target = enemy;
                         }
                     }
-                    if (tower.target == null) {
-                        if (tower.frame.name != '0') tower.setFrame(0);
-                        return true;
-                    }
+                }
+                if (tower.target == null) {
+                    if (tower.frame.name != '0') tower.setFrame(0);
+                    return true;
                 }
                 // rotate towards target
                 tower.setRotation(Phaser.Math.Angle.Between(tower.x, tower.y, tower.target.x, tower.target.y));
@@ -202,7 +227,9 @@ class DragonTD extends Phaser.Scene {
             this.damageProjectiles, this.enemies, 
             (projectile, enemy) => {
                 this.hitEnemy(projectile as Projectile, enemy as Enemy);
-            }, (projectile, enemy) => { return (enemy as Enemy).active;}
+            }, (p, e) => { 
+                return (e as Enemy).active && !(p as Projectile).hitEnemies.contains(e as Enemy);
+            }
         );
 
         this.physics.overlap(
@@ -282,7 +309,7 @@ class DragonTD extends Phaser.Scene {
         let enemyData = this.getLevelEnemyData();
         let totalTime = 0;
         for (let i = 0; i < enemyData.length; i++) {
-            this.time.addEvent({delay: enemyData[i].delay * 1000, repeat: enemyData[i].number, startAt: enemyData[i].start * 1000, callback: ()=>{
+            this.time.addEvent({delay: enemyData[i].delay * 1000, repeat: enemyData[i].number - 1, startAt: (enemyData[i].delay - enemyData[i].start) * 1000, callback: ()=>{
                 this.spawnEnemy(this.levelMap.spawn.x, this.levelMap.spawn.y, enemyData[i].enemyType);
             }});
             totalTime = Math.max(totalTime, enemyData[i].start + enemyData[i].number * enemyData[i].delay);
@@ -292,60 +319,328 @@ class DragonTD extends Phaser.Scene {
         }});
     }
 
-    getLevelEnemyData(): [{enemyType: EnemyTypes, number: number, delay: number, start: number}] {
-        if (this.level <= 1) {
-            return [
+    getLevelEnemyData(): {enemyType: EnemyTypes, number: number, delay: number, start: number}[] {
+        let levelArray = [
+            [ // lv.1 28, 28
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 14,
+                    delay: 2,
+                    start: 0
+                }
+            ], [ // 32, 60
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 4,
+                    delay: 1,
+                    start: 0
+                },
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 4,
+                    delay: 1,
+                    start: 8
+                },
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 4,
+                    delay: 1,
+                    start: 16
+                },
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 4,
+                    delay: 1,
+                    start: 24
+                },
+            ], [ // 20, 80
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 5,
+                    delay: 8,
+                    start: 0
+                },
+            ], [ // 40, 120
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 20,
+                    delay: 1,
+                    start: 0
+                }, 
+            ], [ // 48, 168
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 4,
+                    delay: 16,
+                    start: 0,
+                }, {
+                    enemyType: EnemyTypes.Red,
+                    number: 5,
+                    delay: 0.5,
+                    start: 0.5,
+                }, {
+                    enemyType: EnemyTypes.Red,
+                    number: 5,
+                    delay: 0.5,
+                    start: 16.5,
+                }, {
+                    enemyType: EnemyTypes.Red,
+                    number: 5,
+                    delay: 0.5,
+                    start: 32.5,
+                },{
+                    enemyType: EnemyTypes.Red,
+                    number: 5,
+                    delay: 0.5,
+                    start: 48.5,
+                },
+            ], [ // 60, 228
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 10,
+                    delay: 0.5,
+                    start: 0
+                }, {
+                    enemyType: EnemyTypes.Red,
+                    number: 10,
+                    delay: 0.5,
+                    start: 10,
+                },{
+                    enemyType: EnemyTypes.Red,
+                    number: 10,
+                    delay: 0.5,
+                    start: 20,
+                },
+            ], [ // 28, 256
+                {
+                    enemyType: EnemyTypes.Blue,
+                    number: 4,
+                    delay: 10,
+                    start: 0
+                },
+            ], [ // 40, 296
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 10,
+                    delay: 3,
+                    start: 0
+                },
+            ], [ // 80, 376
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 20,
+                    delay: 1,
+                    start: 0
+                },
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 10,
+                    delay: 2,
+                    start: 0.5
+                },
+            ], [ // lv10 85
+                {
+                    enemyType: EnemyTypes.Blue,
+                    number: 5,
+                    delay: 5,
+                    start: 0
+                }, {
+                    enemyType: EnemyTypes.Red,
+                    number: 25,
+                    delay: 1,
+                    start: 0.5
+                },
+            ], [ // 77
+                {
+                    enemyType: EnemyTypes.Blue,
+                    number: 11,
+                    delay: 2,
+                    start: 0
+                },
+            ], [ // 30
+                {
+                    enemyType: EnemyTypes.Purple,
+                    number: 3,
+                    delay: 5,
+                    start: 0
+                },
+            ], [ // 120
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 30,
+                    delay: 0.25,
+                    start: 0
+                }, {
+                    enemyType: EnemyTypes.Red,
+                    number: 30,
+                    delay: 0.25,
+                    start: 12
+                },
+            ], [ // 105
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 20,
+                    delay: 1.5,
+                    start: 0
+                }, {
+                    enemyType: EnemyTypes.Blue,
+                    number: 5,
+                    delay: 6,
+                    start: 0.75
+                },
+            ], [ // lv15 90
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 30,
+                    delay: 0.75,
+                    start: 0.5
+                }, {
+                    enemyType: EnemyTypes.Purple,
+                    number: 3,
+                    delay: 2,
+                    start: 0
+                },
+            ], [ // 180
                 {
                     enemyType: EnemyTypes.Red,
                     number: 50,
-                    delay: 0.75,
+                    delay: 0.5,
                     start: 0
-                }
-            ]
-        } else if (this.level <= 2) {
-            return [
+                }, {
+                    enemyType: EnemyTypes.Green,
+                    number: 20,
+                    delay: 1,
+                    start: 10
+                },
+            ], [ // 110
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 20,
+                    delay: 0.5,
+                    start: 0.25
+                },{
+                    enemyType: EnemyTypes.Blue,
+                    number: 10,
+                    delay: 1,
+                    start: 0
+                },
+            ], [ // 150
                 {
                     enemyType: EnemyTypes.Green,
-                    number: 50,
-                    delay: 0.75,
+                    number: 20,
+                    delay: 1,
                     start: 0
-                }
-            ]
-        } else if (this.level <= 3) {
-            return [
+                }, {
+                    enemyType: EnemyTypes.Blue,
+                    number: 10,
+                    delay: 2,
+                    start: 0.5
+                },
+            ], [ // 220
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 40,
+                    delay: 0.25,
+                    start: 0.125
+                }, {
+                    enemyType: EnemyTypes.Purple,
+                    number: 4,
+                    delay: 5,
+                    start: 0
+                },
+            ], [ // 185
+               {
+                    enemyType: EnemyTypes.Blue,
+                    number: 25,
+                    delay: 2,
+                    start: 0.5
+                },
+            ], [ // Lv20 125
+                {
+                    enemyType: EnemyTypes.Red,
+                    number: 50,
+                    delay: 0.25,
+                    start: 0
+                }, {
+                    enemyType: EnemyTypes.Gold,
+                    number: 1,
+                    delay: 4,
+                    start: 0.5
+                },
+            ], [ // 270
                 {
                     enemyType: EnemyTypes.Blue,
-                    number: 50,
-                    delay: 0.75,
-                    start: 0
-                }
-            ]
-        } else if (this.level <= 4) {
-            return [
-                {
+                    number: 30,
+                    delay: 1,
+                    start: 0.5
+                }, {
                     enemyType: EnemyTypes.Purple,
-                    number: 50,
-                    delay: 0.75,
+                    number: 6,
+                    delay: 5,
                     start: 0
-                }
-            ]
-        } else if (this.level <= 5) {
-            return [
+                },
+            ], [ // 200
                 {
                     enemyType: EnemyTypes.Gold,
-                    number: 50,
-                    delay: 0.75,
+                    number: 8,
+                    delay: 10,
+                    start: 0
+                },
+            ], [ // Lv23
+                {
+                    enemyType: EnemyTypes.Purple,
+                    number: 10,
+                    delay: 4,
+                    start: 0
+                },
+                {
+                    enemyType: EnemyTypes.Green,
+                    number: 80,
+                    delay: 0.5,
+                    start: 0.25
+                },
+            ], [ // Lv24
+                {
+                    enemyType: EnemyTypes.Gold,
+                    number: 5,
+                    delay: 6,
+                    start: 0
+                },
+                {
+                    enemyType: EnemyTypes.Blue,
+                    number: 30,
+                    delay: 1,
+                    start: 0.5
+                },
+            ], [ // Lv25
+                {
+                    enemyType: EnemyTypes.RedBig,
+                    number: 1,
+                    delay: 4,
                     start: 0
                 }
-            ]
+            ], 
+        ]
+        if (this.level < levelArray.length) {
+            return levelArray[this.level];
         } else {
             return [
                 {
                     enemyType: EnemyTypes.Red,
-                    number: 50 * (1.2 ** this.level),
-                    delay: 0.75 * (0.85 ** this.level),
+                    number: 10 * (1 + 0.2 * this.level),
+                    delay: 4 * (0.95 ** this.level),
                     start: 0
-                }
+                }, {
+                    enemyType: EnemyTypes.Green,
+                    number: 10 * (1 + 0.2 * this.level),
+                    delay: 4 * (0.95 ** this.level),
+                    start: 0.5
+                }, {
+                    enemyType: EnemyTypes.Blue,
+                    number: 10 * (1 + 0.2 * this.level),
+                    delay: 4 * (0.95 ** this.level),
+                    start: 1
+                },
             ]
         }
         
@@ -425,8 +720,14 @@ class DragonTD extends Phaser.Scene {
             if (projectile.pierce <= 0) {
                 projectile.play(projectile.texture.key + '-destroy');
                 this.damageProjectiles.remove(projectile);
-                if ('setVelocity' in projectile.body!) projectile.body.setVelocity(0);
+                if ('setVelocity' in projectile.body!) {
+                    projectile.body.x += (enemy.x - projectile.x) / 4;
+                    projectile.body.y += (enemy.y - projectile.y) / 4;
+                    projectile.body.setVelocity(0);
+                }
                 projectile.once('animationcomplete', () => {projectile.destroy(); });
+            } else {
+                projectile.hitEnemies.add(enemy);
             }
         }
     }
@@ -463,14 +764,6 @@ class DragonTD extends Phaser.Scene {
         this.selected?.destroy();
         this.selected = null;
         this.game.events.emit('selectTower', [null]);
-    }
-
-    upgrade(index: number) {
-        let tower = this.selected!;
-        if (this.treasure < tower.upgrades[index]!.cost) return;
-        this.treasure -= tower.upgrades[index]!.cost;
-        tower.upgrades[index] = tower.upgrades[index]!.upgrade(tower);
-        this.game.events.emit('selectTower', [this.selected]);
     }
 
     buyToggle(index: number) {
@@ -592,13 +885,23 @@ game.events.addListener('selectTower', ([tower]: [Tower | null]) => {
         let upgradeButtons = document.querySelectorAll('#info-bar .upgrade');
         for (let i = 0; i < upgradeButtons.length; i++) {
             let button = upgradeButtons[i] as HTMLButtonElement;
-            if (tower.upgrades.length <= i || tower.upgrades[i] == null) {
+            if (tower.upgrades.length <= i) {
                 button.textContent = 'X';
                 button.onclick = () => {};
             } else {
-                button.textContent = tower.upgrades[i]!.description + '\r\n' + tower.upgrades[i]!.cost;
-                button.onclick = () => {
-                    scene.upgrade(i);
+                for (let upgradeIndex = 0; upgradeIndex < tower.upgrades[i].length; upgradeIndex++) {
+                    if (tower.upgrades[i][upgradeIndex] == null) {
+                        if (upgradeIndex == tower.upgrades[i].length - 1) {
+                            button.textContent = 'X';
+                            button.onclick = () => {};
+                        }
+                    } else {
+                        button.textContent = tower.upgrades[i][upgradeIndex]!.description + '\r\n' + tower.upgrades[i][upgradeIndex]!.cost;
+                        button.onclick = () => {
+                            tower.upgrade(scene, i, upgradeIndex);
+                        }
+                        break;
+                    }
                 }
             }
         }

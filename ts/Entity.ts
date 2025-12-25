@@ -10,18 +10,23 @@ class Enemy extends Phaser.GameObjects.Sprite {
     constructor(config: EnemyOptions) {
         let texture = '';
         switch (config.type) {
+            case EnemyTypes.RedBig:
             case EnemyTypes.Red:
                 texture = 'red-wyvern';
                 break;
+            case EnemyTypes.GreenBig:
             case EnemyTypes.Green:
                 texture = 'green-wyvern';
                 break;
+            case EnemyTypes.BlueBig:
             case EnemyTypes.Blue:
                 texture = 'blue-wyvern';
                 break;
+            case EnemyTypes.PurpleBig:
             case EnemyTypes.Purple:
                 texture = 'purple-wyvern';
                 break;
+            case EnemyTypes.GoldBig:
             case EnemyTypes.Gold:
                 texture = 'gold-wyvern';
                 break;
@@ -35,32 +40,64 @@ class Enemy extends Phaser.GameObjects.Sprite {
         switch (config.type) {
             case EnemyTypes.Red:
                 this.speed = 50;
-                this.maxHealth = 1;
+                this.maxHealth = 2;
+                this.treasure = 2;
                 break;
             case EnemyTypes.Green:
                 this.speed = 50;
-                this.maxHealth = 2;
+                this.maxHealth = 6;
+                this.treasure = 4;
                 break;
             case EnemyTypes.Blue:
                 this.speed = 50;
-                this.maxHealth = 4;
+                this.maxHealth = 10;
+                this.treasure = 7;
                 break;
             case EnemyTypes.Purple:
                 this.speed = 50;
-                this.maxHealth = 6;
+                this.maxHealth = 20;
+                this.treasure = 10;
                 break;
             case EnemyTypes.Gold:
                 this.speed = 50;
-                this.maxHealth = 10;
+                this.maxHealth = 50;
+                this.treasure = 25;
+                break;
+            case EnemyTypes.RedBig:
+                this.speed = 20;
+                this.maxHealth = 200;
+                this.treasure = 50;
+                break;
+            case EnemyTypes.GreenBig:
+                this.speed = 20;
+                this.maxHealth = 400;
+                this.treasure = 100;
+                break;
+            case EnemyTypes.BlueBig:
+                this.speed = 20;
+                this.maxHealth = 800;
+                this.treasure = 200;
+                break;
+            case EnemyTypes.PurpleBig:
+                this.speed = 20;
+                this.maxHealth = 2500;
+                this.treasure = 500;
+                break;
+            case EnemyTypes.GoldBig:
+                this.speed = 20;
+                this.maxHealth = 5000;
+                this.treasure = 2500;
                 break;
         default:
             this.speed = 50;
             this.maxHealth = 1;
+            this.treasure = this.maxHealth;
         }
         this.currentHealth = this.maxHealth;
-        this.treasure = this.maxHealth;
         this.play(texture + '-fly');
-        this.setScale(0.5);
+        if (config.type < EnemyTypes.RedBig) {
+            this.setScale(0.5);
+        }
     }
 }
 
@@ -70,6 +107,11 @@ enum EnemyTypes {
     Blue,
     Purple,
     Gold,
+    RedBig,
+    GreenBig,
+    BlueBig,
+    PurpleBig,
+    GoldBig,
 }
 
 interface EnemyOptions {
@@ -83,7 +125,7 @@ abstract class Tower extends Phaser.GameObjects.Sprite {
     abstract cost: number;
     abstract range: number;
     abstract radius: number;
-    abstract upgrades: (TowerUpgrade | null)[];
+    abstract upgrades: (TowerUpgrade | null)[][];
     abstract description: string;
     abstract towerActions: {action: (scene: DragonTD) => void, cd: number}[];
     abstract canAct: boolean[];
@@ -91,6 +133,13 @@ abstract class Tower extends Phaser.GameObjects.Sprite {
     validColor = 0x111111;
     invalidColor = 0x991111;
     rangeIndicator: Phaser.GameObjects.Arc;
+    damage = 1;
+    pierce = 0;
+    slowMult = 1;
+    spreadHits = 1;
+    maxAngle = 0;
+    effectDuration = 0;
+    projectileSpeed = 200;
     constructor(config: AbstractTowerOptions) {
         super(config.scene, config.x, config.y, config.texture);
         config.scene.add.existing(this);
@@ -106,6 +155,57 @@ abstract class Tower extends Phaser.GameObjects.Sprite {
     select(isSelected: boolean) {
         this.rangeIndicator.setVisible(isSelected);
     }
+
+    upgrade(scene: DragonTD, upgradePath: number, index: number) {
+        let towerUpgrade = this.upgrades[upgradePath][index];
+        if (towerUpgrade == null) return;
+        if (scene.treasure < towerUpgrade.cost) return;
+        this.cost += towerUpgrade.cost;
+        scene.treasure -= towerUpgrade.cost;
+        
+        if (towerUpgrade.upgradeData.texture != undefined) {
+            this.setTexture(towerUpgrade.upgradeData.texture);
+        }
+        if (towerUpgrade.upgradeData.range != undefined) {
+            this.range = towerUpgrade.upgradeData.range;
+            this.rangeIndicator.setRadius(this.range);
+        }
+        if (towerUpgrade.upgradeData.radius != undefined) {
+            this.radius = towerUpgrade.upgradeData.radius;
+        }
+        if (towerUpgrade.upgradeData.cd != undefined) {
+            this.towerActions[0].cd = towerUpgrade.upgradeData.cd;
+        }
+        if (towerUpgrade.upgradeData.damage != undefined) {
+            this.damage = towerUpgrade.upgradeData.damage;
+        }
+        if (towerUpgrade.upgradeData.slowMult != undefined) {
+            this.slowMult = towerUpgrade.upgradeData.slowMult;
+        }
+        if (towerUpgrade.upgradeData.effectDuration != undefined) {
+            this.effectDuration = towerUpgrade.upgradeData.effectDuration;
+        }
+        if (towerUpgrade.upgradeData.pierce != undefined) {
+            this.pierce = towerUpgrade.upgradeData.pierce;
+        }
+        if (towerUpgrade.upgradeData.spreadHits != undefined) {
+            this.spreadHits = towerUpgrade.upgradeData.spreadHits;
+        }
+        if (towerUpgrade.upgradeData.maxAngle != undefined) {
+            this.maxAngle = towerUpgrade.upgradeData.maxAngle;
+        }
+        if (towerUpgrade.upgradeData.projectileSpeed != undefined) {
+            this.projectileSpeed = towerUpgrade.upgradeData.projectileSpeed;
+        }
+        if (towerUpgrade.upgradeData.action0 != undefined) {
+            this.towerActions[0].action = towerUpgrade.upgradeData.action0;
+        }
+        this.upgrades[upgradePath][index] = null;
+        if (index == 2) {
+            this.upgrades[(upgradePath + 1) % 2][2] = null;
+        }
+        scene.game.events.emit('selectTower', [this]);
+    }
 }
 
 class TowerFireball extends Tower {
@@ -113,7 +213,8 @@ class TowerFireball extends Tower {
     cost;
     range;
     radius;
-    upgrades;
+    damage = 1;
+    upgrades: (TowerUpgrade | null)[][];
     towerActions;
     canAct = [true];
     constructor(config: TowerOptions) {
@@ -127,21 +228,53 @@ class TowerFireball extends Tower {
         this.cost = config.cost;
         this.setScale(scale);
         this.upgrades = [
-            new TowerUpgrade(15, 'Increase attack speed', (tower: Tower) => {
-                tower.cost += 15;
-                this.towerActions[0].cd *= 0.8;
-                return null;
-            }),
-            new TowerUpgrade(20, 'Increase range', (tower: Tower) => {
-                tower.cost += 20;
-                tower.range *= 1.3;
-                tower.rangeIndicator.radius = tower.range;
-                return null;
-            }),
+            [
+                {cost:80, description:'Increase attack speed',
+                    upgradeData:{
+                        cd: 1000,
+                    }
+                }, {cost:200, description:'Increase damage',
+                    upgradeData:{
+                        damage:2,
+                    }
+
+                }, {cost:2400, description:'Continuous fire breath',
+                    upgradeData:{
+                        cd: 100,
+                        action0: (scene: DragonTD)=>{
+                            let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'fireball', damage:this.damage, lifetime:1800, speed:100});
+                            projectile.play('fireball-idle');
+                            scene.damageProjectiles.add(projectile);
+                            scene.time.addEvent({delay:projectile.lifetime, callback: (child: Projectile) => {child.destroy()}, args:[projectile]});
+                            if ('setVelocity' in projectile.body!) {
+                                let angle = this.angle + Math.random() * 45 - 22.5;
+                                let moveVector = scene.physics.velocityFromAngle(angle, projectile.speed);
+                                projectile.body.setVelocity(moveVector.x, moveVector.y);
+                                projectile.x += moveVector.x * this.radius / projectile.speed;
+                                projectile.y += moveVector.y * this.radius / projectile.speed;
+                                projectile.setAngle(angle);
+                            }
+                            this.play(this.texture.key + '-attack');
+                        }, 
+                    }
+
+                }
+            ],
+            [
+                {cost:50, description:'Increase range',
+                    upgradeData:{
+                        range: 140
+                    }
+                }, {cost:100, description:'Increase range further',
+                    upgradeData:{
+                        range: 175
+                    }
+                }, null
+            ],
         ]
         this.towerActions = [{
         action: (scene: DragonTD)=>{
-            let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'fireball', damage:1, lifetime:500, speed:400});
+            let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'fireball', damage:this.damage, lifetime:500, speed:400});
             projectile.play('fireball-idle');
             scene.damageProjectiles.add(projectile);
             scene.time.addEvent({delay:projectile.lifetime, callback: (child: Projectile) => {child.destroy()}, args:[projectile]});
@@ -154,7 +287,7 @@ class TowerFireball extends Tower {
             }
             this.play(this.texture.key + '-attack');
         }, 
-        cd: 1000
+        cd: 1300,
     },
     ];
     }
@@ -167,32 +300,42 @@ class TowerIce extends Tower {
     radius;
     slowMult = 0.6;
     effectDuration = 2000;
-    upgrades;
+    upgrades: (TowerUpgrade | null)[][];
     towerActions;
     canAct = [true];
     constructor(config: TowerOptions) {
         let texture = "dragon-ice";
         let scale = 0.5;
         let radius = 96 / 2 * scale;
-        let range = 60;
+        let range = 70;
         super({scene:config.scene, x:config.x, y:config.y, type:config.type, texture:texture, range:range, radius:radius});
         this.radius = radius;
         this.range = range;
         this.cost = config.cost;
         this.setScale(scale);
         this.upgrades = [
-            new TowerUpgrade(30, 'Improves slow effect and duration', (tower: Tower) => {
-                tower.cost += 30;
-                this.slowMult = 0.4;
-                this.effectDuration += 1000;
-                return null;
-            }),
-            new TowerUpgrade(20, 'Increase range', (tower: Tower) => {
-                tower.cost += 20;
-                tower.range *= 1.3;
-                tower.rangeIndicator.radius = tower.range;
-                return null;
-            }),
+            [
+                {
+                    cost:70, description:'Improves slow effect',
+                    upgradeData:{
+                        slowMult: 0.4,
+                    }
+                }, {
+                    cost:90, description:'Improves slow duration',
+                    upgradeData:{
+                        slowMult: 0.4,
+                        effectDuration: 1000,
+                    }
+                },
+            ],
+            [
+                {
+                    cost:50, description:'Increase range',
+                    upgradeData:{
+                        range: 100
+                    }
+                },
+            ],
         ]
         this.towerActions = [{
         action: (scene: DragonTD)=>{
@@ -223,7 +366,11 @@ class TowerEarth extends Tower {
     range;
     radius;
     pierce = 1;
-    upgrades;
+    damage = 1;
+    spreadHits = 2;
+    maxAngle = 90;
+    projectileSpeed = 400;
+    upgrades: (TowerUpgrade | null)[][];
     towerActions;
     canAct = [true];
     constructor(config: TowerOptions) {
@@ -237,21 +384,49 @@ class TowerEarth extends Tower {
         this.cost = config.cost;
         this.setScale(scale);
         this.upgrades = [
-            new TowerUpgrade(15, 'Increase attack speed', (tower: Tower) => {
-                tower.cost += 15;
-                this.towerActions[0].cd *= 0.8;
-                return null;
-            }),
-            new TowerUpgrade(20, 'Increase range', (tower: Tower) => {
-                tower.cost += 20;
-                tower.range *= 1.3;
-                tower.rangeIndicator.radius = tower.range;
-                return null;
-            }),
+            [
+                {
+                    cost:110, description:'Add pierce effect to main hit',
+                    upgradeData:{
+                        pierce: 4,
+                    }
+                }, {
+                    cost:180, description:'Increase damage of main hit',
+                    upgradeData:{
+                        damage: 3,
+                    }
+                }, {
+                    cost:1800, description:'Improved piercing shot',
+                    upgradeData:{
+                        pierce: 10,
+                        projectileSpeed: 800,
+                    }
+                },
+            ],
+            [
+                {
+                    cost:120, description:'Increase number of hits',
+                    upgradeData:{
+                        spreadHits: 4
+                    }
+                }, {
+                    cost:220, description:'Increase number of hits further',
+                    upgradeData:{
+                        spreadHits: 8,
+                        maxAngle: 120,
+                    }
+                }, {
+                    cost:900, description:'Scattershot',
+                    upgradeData:{
+                        spreadHits: 16,
+                        maxAngle: 180,
+                    }
+                },
+            ],
         ]
         this.towerActions = [{
         action: (scene: DragonTD)=>{
-            let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'rockshardlarge', damage:1, lifetime:300, speed:400, pierce: this.pierce});
+            let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'rockshardlarge', damage:this.damage, lifetime:300, speed:this.projectileSpeed, pierce: this.pierce});
             scene.damageProjectiles.add(projectile);
             scene.time.addEvent({delay:projectile.lifetime, callback: (child: Projectile) => {child.destroy()}, args:[projectile]});
             if ('setVelocity' in projectile.body!) {
@@ -261,14 +436,12 @@ class TowerEarth extends Tower {
                 projectile.y += moveVector.y * this.radius / projectile.speed;
                 projectile.setAngle(this.angle);
             }
-            let numSmallShards = 2;
-            let maxAngle = 90;
-            for (let i = 0; i < numSmallShards; i++) {
+            for (let i = 0; i < this.spreadHits; i++) {
                 let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'rockshard', damage:1, lifetime:300, speed:200});
                 scene.damageProjectiles.add(projectile);
                 scene.time.addEvent({delay:projectile.lifetime, callback: (child: Projectile) => {child.destroy()}, args:[projectile]});
                 if ('setVelocity' in projectile.body!) {
-                    let angleOffset = (i/(numSmallShards-1))*maxAngle - maxAngle / 2
+                    let angleOffset = (i/(this.spreadHits-1))*this.maxAngle - this.maxAngle / 2
                     let moveVector = scene.physics.velocityFromAngle(this.angle + angleOffset, projectile.speed);
                     projectile.body.setVelocity(moveVector.x, moveVector.y);
                     projectile.x += moveVector.x * this.radius / projectile.speed;
@@ -278,27 +451,102 @@ class TowerEarth extends Tower {
             }
             this.play(this.texture.key + '-attack');
         }, 
-        cd: 1250
+        cd: 1800
     },
     ];
     }
 }
 
-class TowerUpgrade {
-    cost: number;
-    description: string;
-    upgrade: (tower: Tower) => TowerUpgrade | null;
-    constructor(cost: number, description: string, upgradeFunction: (tower: Tower) => TowerUpgrade | null) {
-        this.cost = cost;
-        this.description = description;
-        this.upgrade = upgradeFunction;
+class TowerLight extends Tower {
+    description = 'A dragon who shoots long ranged bolts of light!';
+    cost;
+    range;
+    radius;
+    damage = 1;
+    pierce = 3;
+    projectileSpeed = 1000;
+    upgrades: (TowerUpgrade | null)[][];
+    towerActions;
+    canAct = [true];
+    constructor(config: TowerOptions) {
+        let texture = "dragon-light";
+        let scale = 0.5;
+        let radius = 96 / 2 * scale;
+        let range = 250;
+        super({scene:config.scene, x:config.x, y:config.y, type:config.type, texture:texture, range:range, radius:radius});
+        this.radius = radius;
+        this.range = range;
+        this.cost = config.cost;
+        this.setScale(scale);
+        this.upgrades = [
+            [
+                {cost:210, description:'Increase attack speed',
+                    upgradeData:{
+                        cd: 1500
+                    }
+                }, {cost:550, description:'Drastically increase attack speed',
+                    upgradeData:{
+                        cd: 400,
+                    }
+
+                }
+            ],
+            [
+                {cost:120, description:'Increase range',
+                    upgradeData:{
+                        range: 300,
+                    }
+                }, {cost:300, description:'Increase pierce',
+                    upgradeData:{
+                        pierce: 4,
+                    }
+                }
+            ],
+        ]
+        this.towerActions = [{
+        action: (scene: DragonTD)=>{
+            let projectile = new Projectile({scene:this.scene, x:this.x, y:this.y, texture:'lightbolt', damage:this.damage, lifetime:400, speed:this.projectileSpeed, pierce:this.pierce});
+            scene.damageProjectiles.add(projectile);
+            scene.time.addEvent({delay:projectile.lifetime, callback: (child: Projectile) => {child.destroy()}, args:[projectile]});
+            if ('setVelocity' in projectile.body!) {
+                let moveVector = scene.physics.velocityFromAngle(this.angle, projectile.speed);
+                projectile.body.setVelocity(moveVector.x, moveVector.y);
+                projectile.x += moveVector.x * this.radius / projectile.speed;
+                projectile.y += moveVector.y * this.radius / projectile.speed;
+                projectile.setAngle(this.angle);
+            }
+            this.play(this.texture.key + '-attack');
+        }, 
+        cd: 2250,
+    },
+    ];
+    }
+}
+
+interface TowerUpgrade {
+    cost: number,
+    description: string,
+    upgradeData: {
+        texture?: string,
+        range?: number,
+        radius?: number,
+        cd?: number,
+        damage?: number,
+        pierce?: number,
+        slowMult?: number,
+        effectDuration?: number,
+        spreadHits?: number,
+        maxAngle?: number,
+        projectileSpeed?: number,
+        action0?: (scene: DragonTD) => void,
     }
 }
 
 enum TowerType {
     Fireball,
     Ice,
-    Earth
+    Earth,
+    Light,
 }
 
 interface AbstractTowerOptions {
@@ -340,6 +588,8 @@ class TowerCard {
                 return new TowerIce(config);
             case TowerType.Earth:
                 return new TowerEarth(config);
+            case TowerType.Light:
+                return new TowerLight(config);
             default:
                 return new TowerFireball(config);
         }
@@ -353,8 +603,10 @@ class Projectile extends Phaser.GameObjects.Sprite {
     slowMult = 1;
     lifetime: number;
     effectDuration = 0;
+    hitEnemies: Phaser.GameObjects.Group;
     constructor(config: ProjectileOptions) {
         super(config.scene, config.x, config.y, config.texture);
+        this.hitEnemies = config.scene.add.group();
         this.damage = config.damage;
         this.speed = config.speed;
         this.lifetime = config.lifetime;
