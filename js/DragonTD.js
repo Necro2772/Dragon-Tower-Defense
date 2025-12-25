@@ -120,7 +120,7 @@ class DragonTD extends Phaser.Scene {
             });
         }
         // Allow testing by starting at later levels
-        let testLevel = 25;
+        let testLevel = 0;
         for (let i = 0; i < testLevel; i++) {
             let levelData = this.getLevelEnemyData();
             for (let index = 0; index < levelData.length; index++) {
@@ -817,7 +817,7 @@ game.events.addListener('populateTowerList', ([cards]) => {
     for (let i = 0; i < cards.length; i++) {
         let newTower = document.createElement("li");
         let newButton = newTower.appendChild(document.createElement("button"));
-        newButton.style = "background-image: url(/img/card-" + cards[i].image + ".png);\n";
+        newButton.style = "background-image: url(img/card-" + cards[i].image + ".png);\n";
         newButton.className = 'disabled';
         newButton.onclick = (() => {
             if (newButton.className != 'enabled') {
