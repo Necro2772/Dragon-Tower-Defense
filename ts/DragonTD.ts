@@ -9,13 +9,14 @@ class DragonTD extends Phaser.Scene {
     selected: Tower | null = null;
     selectedCard: number = -1;
     isSpawning = false;
-    lives = 20;
-    treasure = 200;
+    lives = 0;
+    treasure = 0;
     level = 0;
-    sellMult = 0.7;
+    sellMult = 0;
     gameSpeed = GameSpeed.Normal;
     timeMult = 1;
-    isPaused = true;
+    isPaused = false;
+    isGameOver = false;
 
     preload() {
         this.load.tilemapTiledJSON("map", "maps/map.json");
@@ -41,11 +42,6 @@ class DragonTD extends Phaser.Scene {
         this.loadMap();
         this.cameras.main.centerOn(this.levelMap.tiles.widthInPixels / 2, this.levelMap.tiles.heightInPixels / 2);
         this.cameras.main.setZoom(this.cameras.main.height / this.levelMap.tiles.heightInPixels);
-        this.enemies = this.add.group();
-        this.slowableEnemies = this.add.group();
-        this.towers = this.add.group();
-        this.damageProjectiles = this.add.group();
-        this.iceProjectiles = this.add.group();
         this.towerCards = [
             new TowerCard(TowerType.Fireball,
                 "dragon-fire", "a dragon! crispt!",
@@ -60,14 +56,10 @@ class DragonTD extends Phaser.Scene {
                 90,
             ),
             new TowerCard(TowerType.Light,
-                "dragon-light", "An earth dragon who shoots sharp rock shards!",
+                "dragon-light", "A light dragon who shoots long ranged beams of light!",
                 200,
             )
         ]
-        this.game.events.emit('populateTowerList', [
-            this.towerCards,
-        ])
-        this.pause();
 
         // Animation loading
         let enemyKeys = ['red-wyvern', 'green-wyvern', 'blue-wyvern', 'purple-wyvern', 'gold-wyvern'];
@@ -135,16 +127,17 @@ class DragonTD extends Phaser.Scene {
         }
 
         // Allow testing by starting at later levels
-        let testLevel = 0;
-        for (let i = 0; i < testLevel; i++) {
-            let levelData = this.getLevelEnemyData();
-            for (let index = 0; index < levelData.length; index++) {
-                let testEnemy = new Enemy({scene:this, x:0, y:0, type:levelData[index].enemyType});
-                this.treasure += testEnemy.treasure * levelData[index].number;
-                testEnemy.destroy();
-            }
-            this.level = i;
-        }
+        // let startLevel = 0;
+        // for (let i = 0; i < startLevel; i++) {
+        //     let levelData = this.getLevelEnemyData();
+        //     for (let index = 0; index < levelData.length; index++) {
+        //         let testEnemy = new Enemy({scene:this, x:0, y:0, type:levelData[index].enemyType});
+        //         this.treasure += testEnemy.treasure * levelData[index].number;
+        //         testEnemy.destroy();
+        //     }
+        //     this.level = i;
+        // }
+        this.restart();
     }
 
     update(time: number, delta: number) {
@@ -261,7 +254,10 @@ class DragonTD extends Phaser.Scene {
     }
 
     changeSpeed(): string {
-        if (this.isPaused) {
+        if (this.isGameOver) {
+            this.restart();
+            return 'Play';
+        } else if (this.isPaused) {
             this.resume();
         } else {
             this.gameSpeed = (this.gameSpeed + 1) % 3;
@@ -662,6 +658,42 @@ class DragonTD extends Phaser.Scene {
         this.isPaused = false;
     }
 
+    gameOver() {
+        this.game.events.emit('gameOver');
+        this.pause();
+        this.game.events.emit('changeSpeed', ['Restart']);
+        this.isGameOver = true;
+    }
+
+    restart() {
+        this.enemies?.destroy(true);
+        this.slowableEnemies?.destroy(true);
+        this.towers?.destroy(true);
+        this.damageProjectiles?.destroy(true);
+        this.iceProjectiles?.destroy(true);
+
+        this.enemies = this.add.group();
+        this.slowableEnemies = this.add.group();
+        this.towers = this.add.group();
+        this.damageProjectiles = this.add.group();
+        this.iceProjectiles = this.add.group();
+        this.selected = null;
+        this.selectedCard = -1;
+        this.isSpawning = false;
+        this.lives = 20;
+        this.treasure = 200;
+        this.level = 0;
+        this.sellMult = 0.7;
+        this.gameSpeed = GameSpeed.Normal;
+        this.timeMult = 1;
+        this.isPaused = true;
+        this.isGameOver = false;
+        this.game.events.emit('populateTowerList', [
+            this.towerCards
+        ])
+        this.pause();
+    }
+
     spawnEnemy(x: number, y: number, enemyType: EnemyTypes) {
         let enemy = new Enemy({scene:this, x:x, y:y, type: enemyType});
         this.enemies.add(enemy);
@@ -743,6 +775,9 @@ class DragonTD extends Phaser.Scene {
 
     takeDamage(damage: number) {
         this.lives -= damage;
+        if (this.lives <= 0) {
+            this.gameOver();
+        }
     }
 
     select(tower: Tower | null) {
@@ -849,7 +884,13 @@ game.events.addListener('updateTopBar', ([lives, treasure, level]: [number, numb
 
 game.events.addListener('populateTowerList', ([cards]: [TowerCard[]]) => {
     let scene = (game.scene.getAt(0) as DragonTD);
+    document.getElementById('game-over')!.style.display = 'none';
+    document.getElementById('tower-list')!.style.display = 'flex';
+    document.getElementById('tower-info')!.style.display = 'none';
     let towerList = document.getElementById('tower-list') as HTMLOListElement;
+    while (towerList.lastChild != null) {
+        towerList.removeChild(towerList.lastChild);
+    }
     for (let i = 0; i < cards.length; i++) {
         let newTower = document.createElement("li");
         let newButton = newTower.appendChild(document.createElement("button"));
@@ -915,6 +956,12 @@ let speedButton = document.getElementById('speedButton')!;
 game.events.addListener('changeSpeed', ([newSpeed]: [string]) => {
     speedButton.textContent = newSpeed;
 });
+
+game.events.addListener('gameOver', () => {
+    document.getElementById('game-over')!.style.display = 'block';
+    document.getElementById('tower-list')!.style.display = 'none';
+    document.getElementById('tower-info')!.style.display = 'none';
+})
 
 speedButton.onclick = () => {
     let scene = (game.scene.getAt(0) as DragonTD);

@@ -49,6 +49,10 @@ header {
     font-size: 1em;
 }
 
+#game-over {
+    font-size: 2em;
+}
+
 #game-ui {
     flex: 1;
     display: block;

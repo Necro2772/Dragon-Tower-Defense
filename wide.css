@@ -1,6 +1,7 @@
 #main-content {
     justify-content: center;
     align-items: center;
+    padding: 0 10em;
 }
 
 #game-ui, #info-bar {
